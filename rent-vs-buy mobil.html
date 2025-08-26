@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Rent vs Buy — Mobile‑Friendly Calculator</title>
+<style>
+  :root { --radius: 14px; --border:#e5e7eb; --muted:#6b7280; --ok:#0a7f2e; --bad:#b00020; --bg:#ffffff; }
+  html, body { height: 100%; background: var(--bg); }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: #0f172a; }
+  .container { max-width: 1100px; padding: 20px 16px 84px; margin: 0 auto; }
+  h1 { margin: 6px 0 6px; font-size: clamp(20px, 4vw, 28px); }
+  p.muted { color: var(--muted); margin: 0 0 16px; }
+
+  /* Cards & layout */
+  .grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.02); }
+  @media (min-width: 900px) { .grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
+
+  /* Inputs: mobile friendly */
+  label { display:block; font-weight:600; margin: 10px 0 6px; }
+  input[type="number"] { width:100%; padding:14px 12px; box-sizing:border-box; border:1px solid var(--border); border-radius:10px; font-size:16px; /* prevent iOS zoom */ }
+  input[type="checkbox"] { width: 20px; height: 20px; }
+  .flex { display:flex; gap: 10px; align-items:center; margin-top: 8px; }
+  .tag { display:inline-block; border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-size:.9rem; color:#111827; }
+  .small { font-size: .95rem; color: var(--muted); }
+  .out { font-size: 1.05rem; margin: 8px 0; }
+  .kpi { font-size: 1.25rem; font-weight: 800; }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+  .neutral { color: #374151; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: #111827; font-weight: 600; }
+
+  /* Tables: horizontal scroll on mobile */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px dashed var(--border); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 720px; background: #fff; }
+  th, td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+
+  .section-title { margin: 18px 2px 10px; font-size: 1.12rem; font-weight: 700; }
+  .warn { background:#fff7ed; border:1px solid #fed7aa; padding:10px; border-radius:10px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+  /* Sticky action bar for phones */
+  .actionbar { position: sticky; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,.96); backdrop-filter: saturate(1.2) blur(6px); border-top: 1px solid var(--border); padding: 10px 16px; display: flex; gap: 10px; align-items: center; justify-content: space-between; z-index: 20; }
+  .btn { padding: 14px 16px; border: 1px solid #0f172a; background: #111827; color: #fff; border-radius: 12px; font-size: 16px; min-height: 48px; cursor: pointer; }
+  .btn:active { transform: translateY(1px); }
+
+  @media (min-width: 900px) { .actionbar { position: static; padding: 0; background: transparent; border: 0; } .btn { min-height: 40px; } }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Rent vs Buy — Invest the Difference</h1>
+    <p class="muted">Mobile‑friendly tool to compare buying with a mortgage vs renting and investing either the <em>difference</em> or the <em>full mortgage‑equivalent</em> every month.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Home / Mortgage</h3>
+        <label>Home price</label>
+        <input id="price" type="number" inputmode="decimal" value="8000000" step="10000" />
+        <label>Down payment (%)</label>
+        <input id="downPct" type="number" inputmode="decimal" value="20" step="0.5" />
+        <label>Mortgage rate (APR, %)</label>
+        <input id="rate" type="number" inputmode="decimal" value="4.9" step="0.05" />
+        <label>Term (years)</label>
+        <input id="term" type="number" inputmode="numeric" value="30" step="1" />
+      </div>
+
+      <div class="card">
+        <h3>Rent & Investing</h3>
+        <label>Initial monthly rent</label>
+        <input id="rent0" type="number" inputmode="decimal" value="28000" step="500" />
+        <label>Rent growth (%/yr)</label>
+        <input id="rentG" type="number" inputmode="decimal" value="0" step="0.25" />
+        <label>Investment return (%/yr)</label>
+        <input id="inv" type="number" inputmode="decimal" value="6" step="0.25" />
+        <label>Analysis horizon (years)</label>
+        <input id="horizon" type="number" inputmode="numeric" value="10" step="1" />
+        <div class="flex">
+          <input id="investInitial" type="checkbox" checked />
+          <label for="investInitial" style="margin:0;">Renter invests initial cash (down + 2% closing)</label>
+        </div>
+        <div class="flex">
+          <input id="investFull" type="checkbox" />
+          <label for="investFull" style="margin:0;">Invest full mortgage‑equivalent each month (ignore rent)</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Market & Exit</h3>
+        <label>Home appreciation (%/yr)</label>
+        <input id="app" type="number" inputmode="decimal" value="3" step="0.25" />
+        <label>Selling costs (% of sale price)</label>
+        <input id="sell" type="number" inputmode="decimal" value="5" step="0.25" />
+
+        <details>
+          <summary>Advanced (owner costs)</summary>
+          <div class="small">Include typical owner costs in the monthly comparison:</div>
+          <label>Property tax (% of value / yr)</label>
+          <input id="propTax" type="number" inputmode="decimal" value="0" step="0.05" />
+          <label>Insurance (% of value / yr)</label>
+          <input id="ins" type="number" inputmode="decimal" value="0.10" step="0.05" />
+          <label>Maintenance (% of value / yr)</label>
+          <input id="maint" type="number" inputmode="decimal" value="1.0" step="0.1" />
+          <label>HOA / building (per month)</label>
+          <input id="hoa" type="number" inputmode="decimal" value="3000" step="100" />
+          <div class="flex">
+            <input id="useOwnerCosts" type="checkbox" />
+            <label for="useOwnerCosts" style="margin:0;">Include owner costs in Owner Outflow</label>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="actionbar">
+      <button id="run" class="btn">Recalculate</button>
+      <span class="tag" id="modeTag">Mode: invest difference</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Result at Horizon</h3>
+        <div class="out">Buy — sale proceeds after debt & selling costs: <span id="buySale">–</span></div>
+        <div class="out">Buy — total wealth: <span id="buyWealth">–</span></div>
+        <hr />
+        <div class="out">Rent — invested monthly contributions: <span id="rentContrib">–</span></div>
+        <div class="out">Rent — initial lump sum invested: <span id="rentInitial">–</span></div>
+        <div class="out">Rent — portfolio value: <span id="rentWealth">–</span></div>
+        <hr />
+        <div class="out kpi neutral" id="winner">–</div>
+      </div>
+      <div class="card">
+        <h3>Key Numbers</h3>
+        <div class="out">Monthly mortgage payment: <span id="pmt">–</span></div>
+        <div class="out">Initial cash to buy (down + 2% closing): <span id="initialCash">–</span></div>
+        <div class="out">Breakeven year (first Buy ≥ Rent): <span id="breakeven">–</span></div>
+      </div>
+      <div class="card">
+        <h3>Yearly Snapshot</h3>
+        <div class="table-wrap">
+          <table id="yearTable"><thead>
+            <tr>
+              <th>Year</th>
+              <th>Buy sale proceeds</th>
+              <th>Rent portfolio</th>
+              <th>Diff (Buy − Rent)</th>
+            </tr>
+          </thead><tbody id="yearTbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">Detailed Calculations</div>
+    <div class="card">
+      <div id="calcDetails">
+        <p class="small">Run the calculator to see a full breakdown of inputs, derived values, year-by-year mechanics, and download the month-by-month ledger.</p>
+      </div>
+    </div>
+
+    <div class="section-title">Intermediate steps (monthly ledger)</div>
+    <div class="card">
+      <p class="small">Scrollable table on phones. Use pagination to navigate.</p>
+      <div id="monthlyControls" style="margin-bottom:8px;"></div>
+      <div class="table-wrap"><div id="monthlyTable"></div></div>
+    </div>
+  </div>
+
+<script>
+/**
+ * Mobile-friendly rent vs buy calculator with inline formulas.
+ * See the inline documentation in calc() for step-by-step math.
+ */
+function fmt(n){return n.toLocaleString(undefined,{maximumFractionDigits:0});}
+function pmt(ratePer,nper,pv){ if(Math.abs(ratePer)<1e-12) return pv/nper; const r=ratePer; return pv*r/(1-Math.pow(1+r,-nper)); }
+
+function calc(){
+  // Inputs
+  const price=+document.getElementById('price').value;
+  const downPct=+document.getElementById('downPct').value/100;
+  const rate=+document.getElementById('rate').value/100;
+  const termYears=+document.getElementById('term').value;
+
+  const rent0=+document.getElementById('rent0').value;
+  const rentG=+document.getElementById('rentG').value/100;
+  const inv=+document.getElementById('inv').value/100;
+  const horizonY=+document.getElementById('horizon').value;
+  const investInitial=document.getElementById('investInitial').checked;
+  const investFull=document.getElementById('investFull').checked;
+
+  const app=+document.getElementById('app').value/100;
+  const sell=+document.getElementById('sell').value/100;
+
+  const useOwnerCosts=document.getElementById('useOwnerCosts').checked;
+  const propTax=(+document.getElementById('propTax').value||0)/100;
+  const ins=(+document.getElementById('ins').value||0)/100;
+  const maint=(+document.getElementById('maint').value||0)/100;
+  const hoa=(+document.getElementById('hoa').value||0);
+
+  // Derived
+  const months=Math.round(horizonY*12);
+  const termMonths=Math.round(termYears*12);
+  const loan=price*(1-downPct);
+  const r_m=rate/12;                    // monthly mortgage rate
+  const inv_m=Math.pow(1+inv,1/12)-1;   // monthly investment return
+  const app_m=Math.pow(1+app,1/12)-1;   // monthly appreciation
+  const rent_m=Math.pow(1+rentG,1/12)-1;// monthly rent growth
+  const closPct=0.02;                   // 2% closing estimate
+  const initialCash=price*downPct+price*closPct; // down + closing
+
+  // Mortgage payment
+  const pay=pmt(r_m,termMonths,loan);
+  document.getElementById('pmt').textContent=fmt(Math.round(pay));
+  document.getElementById('initialCash').textContent=fmt(Math.round(initialCash));
+  document.getElementById('modeTag').textContent = 'Mode: ' + (investFull? 'invest full mortgage‑equivalent' : 'invest difference');
+
+  // State
+  let bal=loan, home=price, rentNow=rent0;
+  let renterPort=investInitial?initialCash:0;
+  let totalContrib=investInitial?initialCash:0;
+
+  const years=[]; const buyNW=[]; const rentNW=[]; const buySale=[]; const rentContributions=[];
+  const yearRows=[]; let breakeven=null;
+
+  let yStartHome=home, yStartBal=bal, yStartPort=renterPort;
+  let yInterest=0, yPrincipal=0, yMortPmt=0, yExtras=0, yOwnerOut=0, yRent=0, yContrib=investInitial?initialCash:0;
+
+  const csvRows=[[
+    'month','year','home_start','home_end','balance_start','interest','principal','mort_pmt','extras','owner_out','rent','diff','contribution','portfolio_start','portfolio_end'
+  ]];
+
+  for(let m=1;m<=months;m++){
+    const homeStart=home, balStart=bal, portStart=renterPort;
+
+    // Amortization
+    const interest=(m<=termMonths)?bal*r_m:0;
+    const principal=(m<=termMonths)?Math.min(pay-interest,bal):0;
+    const mortPmt=(m<=termMonths)?(interest+principal):0;
+    bal-=principal;
+
+    // Owner costs
+    const ownerExtras=useOwnerCosts?(((propTax+ins+maint)*home)/12 + hoa):0;
+
+    // Outflows and contribution rule
+    const ownerOutflow=mortPmt+(useOwnerCosts?ownerExtras:0);
+    const rentOutflow=rentNow;
+    const contribution = investFull ? ownerOutflow : Math.max(0, ownerOutflow - rentOutflow);
+
+    // Portfolio update
+    renterPort = renterPort*(1+inv_m) + contribution;
+
+    // Trackers
+    yInterest+=interest; yPrincipal+=principal; yMortPmt+=mortPmt; yExtras+=ownerExtras; yOwnerOut+=ownerOutflow; yRent+=rentOutflow; yContrib+=contribution;
+
+    // Progress market values
+    home*=(1+app_m); rentNow*=(1+rent_m);
+
+    // Ledger row
+    csvRows.push([
+      m, Math.ceil(m/12), Math.round(homeStart), Math.round(home), Math.round(balStart), Math.round(interest), Math.round(principal), Math.round(mortPmt), Math.round(ownerExtras), Math.round(ownerOutflow), Math.round(rentOutflow), Math.round(ownerOutflow-rentOutflow), Math.round(contribution), Math.round(portStart), Math.round(renterPort)
+    ]);
+
+    if(m%12===0){
+      const year=m/12;
+      const saleProceeds=home*(1-sell)-bal;
+      const buyWealthYear=saleProceeds;
+      const rentWealthYear=renterPort;
+
+      years.push(year); buyNW.push(buyWealthYear); rentNW.push(rentWealthYear); buySale.push(saleProceeds);
+      rentContributions.push(yContrib - (investInitial?initialCash:0));
+
+      const invGrowth = renterPort - yStartPort - (yContrib - (investInitial?initialCash:0));
+      yearRows.push({ year, homeStart:yStartHome, homeEnd:home, appAmount:home-yStartHome, balStart:yStartBal, balEnd:bal, intSum:yInterest, prinSum:yPrincipal, mortPmtSum:yMortPmt, extrasSum:yExtras, ownerOutSum:yOwnerOut, rentSum:yRent, diffSum:yOwnerOut-yRent, contribSum:yContrib - (investInitial?initialCash:0), portStart:yStartPort, invGrowth, portEnd:renterPort, saleProceeds, buyWealth:buyWealthYear, rentWealth:rentWealthYear });
+
+      if(breakeven===null && buyWealthYear>=rentWealthYear) breakeven=year;
+      yStartHome=home; yStartBal=bal; yStartPort=renterPort; yInterest=0; yPrincipal=0; yMortPmt=0; yExtras=0; yOwnerOut=0; yRent=0; yContrib=0;
+    }
+  }
+
+  // Outputs
+  const buyTotal=buyNW.at(-1); const rentTotal=rentNW.at(-1); const buyFinalSale=buySale.at(-1); const rentFinalContrib=rentContributions.at(-1);
+  document.getElementById('buySale').textContent=fmt(Math.round(buyFinalSale));
+  document.getElementById('buyWealth').textContent=fmt(Math.round(buyTotal));
+  document.getElementById('rentContrib').textContent=fmt(Math.round(rentFinalContrib));
+  document.getElementById('rentInitial').textContent=(document.getElementById('investInitial').checked?fmt(Math.round(initialCash)):fmt(0));
+  document.getElementById('rentWealth').textContent=fmt(Math.round(rentTotal));
+
+  const winnerEl=document.getElementById('winner');
+  winnerEl.className='out kpi neutral';
+  if(buyTotal>rentTotal){ winnerEl.textContent='→ BUY is ahead at your horizon'; winnerEl.className='out kpi ok'; }
+  else if(buyTotal<rentTotal){ winnerEl.textContent='→ RENT & INVEST is ahead at your horizon'; winnerEl.className='out kpi bad'; }
+  else { winnerEl.textContent='→ TIE at your horizon'; }
+  document.getElementById('breakeven').textContent=breakeven?breakeven:'—';
+
+  // Year table render
+  const yTbody=document.getElementById('yearTbody');
+  yTbody.innerHTML='';
+  years.forEach((y,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${y}</td><td class="mono">${fmt(Math.round(buySale[i]))}</td><td class="mono">${fmt(Math.round(rentNW[i]))}</td><td class="mono">${fmt(Math.round(buyNW[i]-rentNW[i]))}</td>`;
+    yTbody.appendChild(tr);
+  });
+
+  // Detailed calculations blocks
+  const det=[];
+  det.push(`<div class="warn small">Transparency: below we list inputs, derived values, and the year-by-year mechanics (interest, principal, outflows, contributions, portfolio growth, balances, and sale proceeds). You can also download the full monthly ledger as CSV.</div>`);
+  det.push(`<div class="section-title">Inputs Used</div>`);
+  det.push(`<div class="table-wrap"><table><tbody>
+    <tr><td>Home price</td><td class="mono">${fmt(price)}</td></tr>
+    <tr><td>Down payment %</td><td class="mono">${(downPct*100).toFixed(2)}%</td></tr>
+    <tr><td>Mortgage APR</td><td class="mono">${(rate*100).toFixed(3)}%</td></tr>
+    <tr><td>Term (years)</td><td class="mono">${termYears}</td></tr>
+    <tr><td>Initial rent</td><td class="mono">${fmt(rent0)}</td></tr>
+    <tr><td>Rent growth (annual)</td><td class="mono">${(rentG*100).toFixed(2)}%</td></tr>
+    <tr><td>Investment return (annual)</td><td class="mono">${(inv*100).toFixed(2)}%</td></tr>
+    <tr><td>Horizon (years)</td><td class="mono">${horizonY}</td></tr>
+    <tr><td>Home appreciation (annual)</td><td class="mono">${(app*100).toFixed(2)}%</td></tr>
+    <tr><td>Selling costs</td><td class="mono">${(sell*100).toFixed(2)}%</td></tr>
+    <tr><td>Renter invests initial cash?</td><td class="mono">${investInitial? 'Yes' : 'No'}</td></tr>
+    <tr><td>Mode</td><td class="mono">${investFull? 'Invest full mortgage‑equivalent' : 'Invest difference'}</td></tr>
+    ${useOwnerCosts? `<tr><td colspan="2"><em>Owner costs included:</em> property tax ${(propTax*100).toFixed(2)}%, insurance ${(ins*100).toFixed(2)}%, maintenance ${(maint*100).toFixed(2)}%, HOA ${fmt(hoa)}/mo</td></tr>` : ''}
+  </tbody></table></div>`);
+
+  det.push(`<div class="section-title">Derived Numbers</div>`);
+  det.push(`<div class="table-wrap"><table><tbody>
+    <tr><td>Loan amount</td><td class="mono">${fmt(Math.round(loan))}</td></tr>
+    <tr><td>Monthly mortgage rate</td><td class="mono">${(r_m*100).toFixed(4)}%</td></tr>
+    <tr><td>Monthly investment return</td><td class="mono">${(inv_m*100).toFixed(4)}%</td></tr>
+    <tr><td>Monthly home appreciation</td><td class="mono">${(app_m*100).toFixed(4)}%</td></tr>
+    <tr><td>Monthly rent growth</td><td class="mono">${(rent_m*100).toFixed(4)}%</td></tr>
+    <tr><td>Fixed monthly mortgage payment (PMT)</td><td class="mono">${fmt(Math.round(pay))}</td></tr>
+    <tr><td>Initial cash to buy (down + 2% closing)</td><td class="mono">${fmt(Math.round(initialCash))}</td></tr>
+  </tbody></table></div>`);
+
+  det.push(`<div class="section-title">Year‑by‑Year Mechanics</div>`);
+  det.push(`<div class="table-wrap"><table><thead>
+    <tr>
+      <th>Year</th><th>Home start</th><th>Home end</th><th>Appreciation</th>
+      <th>Bal start</th><th>Bal end</th><th>Interest</th><th>Principal</th>
+      <th>Mortgage PMTs</th><th>Owner extras</th><th>Owner outflow</th><th>Rent outflow</th>
+      <th>Diff (Owner−Rent)</th><th>Contribs</th><th>Port start</th><th>Inv growth</th>
+      <th>Port end</th><th>Sale proceeds</th><th>Buy wealth</th><th>Rent wealth</th>
+    </tr></thead><tbody>`);
+  yearRows.forEach(r=>{ det.push(`<tr>
+    <td>${r.year}</td>
+    <td class="mono">${fmt(Math.round(r.homeStart))}</td>
+    <td class="mono">${fmt(Math.round(r.homeEnd))}</td>
+    <td class="mono">${fmt(Math.round(r.appAmount))}</td>
+    <td class="mono">${fmt(Math.round(r.balStart))}</td>
+    <td class="mono">${fmt(Math.round(r.balEnd))}</td>
+    <td class="mono">${fmt(Math.round(r.intSum))}</td>
+    <td class="mono">${fmt(Math.round(r.prinSum))}</td>
+    <td class="mono">${fmt(Math.round(r.mortPmtSum))}</td>
+    <td class="mono">${fmt(Math.round(r.extrasSum))}</td>
+    <td class="mono">${fmt(Math.round(r.ownerOutSum))}</td>
+    <td class="mono">${fmt(Math.round(r.rentSum))}</td>
+    <td class="mono">${fmt(Math.round(r.diffSum))}</td>
+    <td class="mono">${fmt(Math.round(r.contribSum))}</td>
+    <td class="mono">${fmt(Math.round(r.portStart))}</td>
+    <td class="mono">${fmt(Math.round(r.invGrowth))}</td>
+    <td class="mono">${fmt(Math.round(r.portEnd))}</td>
+    <td class="mono">${fmt(Math.round(r.saleProceeds))}</td>
+    <td class="mono">${fmt(Math.round(r.buyWealth))}</td>
+    <td class="mono">${fmt(Math.round(r.rentWealth))}</td>
+  </tr>`); });
+  det.push(`</tbody></table></div>`);
+
+  det.push(`<div class="section-title">Month‑by‑Month Ledger</div>`);
+  det.push(`<p class="small">Download the raw monthly calculations (interest, principal, owner/rent outflows, contributions, portfolio path, balances):</p>`);
+  det.push(`<button id="dlCsv" class="btn" style="padding:10px 14px; background:#2563eb; border-color:#2563eb;">Download monthly ledger (CSV)</button>`);
+
+  document.getElementById('calcDetails').innerHTML = det.join('');
+
+  // Save CSV for the paginated monthly table below
+  CSV_GLOBAL = csvRows; MONTH_PAGE = 1; renderMonthlyTable();
+
+  const btn = document.getElementById('dlCsv');
+  if(btn){ btn.onclick = () => { const csv = csvRows.map(r=>r.join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='rent_vs_buy_monthly_ledger.csv'; a.click(); URL.revokeObjectURL(url); }; }
+}
+
+// Pagination helpers for monthly intermediate steps
+let CSV_GLOBAL=null; let MONTH_PAGE=1; let MONTH_PAGESIZE=24;
+function renderMonthlyControls(){
+  const ctrl=document.getElementById('monthlyControls'); if(!ctrl) return;
+  const totalRows=CSV_GLOBAL ? (CSV_GLOBAL.length-1) : 0; const totalPages=Math.max(1, Math.ceil(totalRows/MONTH_PAGESIZE));
+  ctrl.innerHTML = `
+    <div class="flex" style="flex-wrap:wrap; gap:10px; align-items:center;">
+      <span class="small">Rows per page:</span>
+      <select id="rowsPerPage" style="padding:8px 10px; border:1px solid var(--border); border-radius:8px;">
+        <option ${MONTH_PAGESIZE===12?'selected':''}>12</option>
+        <option ${MONTH_PAGESIZE===24?'selected':''}>24</option>
+        <option ${MONTH_PAGESIZE===60?'selected':''}>60</option>
+        <option ${MONTH_PAGESIZE===120?'selected':''}>120</option>
+        <option ${MONTH_PAGESIZE===240?'selected':''}>240</option>
+      </select>
+      <button id="prevPage" class="btn" style="background:#f8fafc; color:#111827; border-color:#cbd5e1;">◀ Prev</button>
+      <span class="small">Page ${MONTH_PAGE} / ${totalPages}</span>
+      <button id="nextPage" class="btn" style="background:#f8fafc; color:#111827; border-color:#cbd5e1;">Next ▶</button>
+    </div>`;
+  document.getElementById('rowsPerPage').onchange=(e)=>{ MONTH_PAGESIZE=parseInt(e.target.value,10); MONTH_PAGE=1; renderMonthlyTable(); };
+  document.getElementById('prevPage').onclick=()=>{ if(MONTH_PAGE>1){ MONTH_PAGE--; renderMonthlyTable(); } };
+  document.getElementById('nextPage').onclick=()=>{ if(CSV_GLOBAL && MONTH_PAGE < Math.ceil((CSV_GLOBAL.length-1)/MONTH_PAGESIZE)){ MONTH_PAGE++; renderMonthlyTable(); } };
+}
+function renderMonthlyTable(){
+  const wrap=document.getElementById('monthlyTable'); if(!wrap || !CSV_GLOBAL) return;
+  const header=CSV_GLOBAL[0]; const rows=CSV_GLOBAL.slice(1);
+  const start=(MONTH_PAGE-1)*MONTH_PAGESIZE; const view=rows.slice(start, start+MONTH_PAGESIZE);
+  let html='<table><thead><tr>'+ header.map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  for(const r of view){ html += '<tr>'+ r.map((v,i)=>`<td class="mono" style="text-align:${i===0||i===1?'left':'right'}">${(typeof v==='number')? v.toLocaleString(undefined,{maximumFractionDigits:0}) : v}</td>`).join('') + '</tr>'; }
+  html += '</tbody></table>'; wrap.innerHTML=html; renderMonthlyControls(); }
+
+// Recalculate on input; large, touch-friendly controls
+['price','downPct','rate','term','rent0','rentG','inv','horizon','investInitial','investFull','app','sell','useOwnerCosts','propTax','ins','maint','hoa'].forEach(id=>document.getElementById(id).addEventListener('input',calc));
+
+document.getElementById('run').addEventListener('click',calc);
+
+// Initial run
+calc();
+</script>
+</body>
+</html>
